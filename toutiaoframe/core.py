@@ -3,7 +3,7 @@
 ##################################################
 # AUTHOR : Yandi LI
 # CREATED_AT : 2015-09-15
-# LAST_MODIFIED : 2015年11月14日 星期六 22时28分13秒
+# LAST_MODIFIED : 2015年11月15日 星期日 01时32分34秒
 # USAGE : python core.py
 # PURPOSE : TODO
 ##################################################
@@ -382,23 +382,27 @@ class RestfulIO(Core):
   Have to be initialized with config(), setting basic params of the Restful query.
   """
   def config(self, 
-              REST_METHOD= 'insert', 
+              REST_METHOD= 'post', 
               TABLE_NAME='', 
+              URL= '',
+              TARGET_FIELD=None,
               APPSOURCE=2936099636, APPKEY=1428722706):
     """ Set model parameters
     @Parameters
     -----------------------------
-    | REST_METHOD: one of 'insert', 'delete', 'show', 'test'. 
+    | REST_METHOD: one of 'post', 'get', 'test'. 
                 An isinstance can perform only one kind of the operations.
     | TABLE_NAME: table name of the restful service, REQUIRED
-    | SCHEMA: list, column names of the target table, REQUIRED,
-              e.g., ["object_id", "article_id"] in order
+    | URL: API e.g, 'http://i2.api.weibo.com/2/darwin/table/show.json', REQUIRED
+    | TARGET_FIELD: denote the field name that we want to keep in the result json, 
     | APPSOURCE: source of the restful service, defaulted
     | APPKEY: appkey of the restful, defaulted
     """
-    assert REST_METHOD in ["insert", "delete", "show", "test"]
+    assert REST_METHOD in ['post', 'get', 'test', 'insert', 'delete', 'show']
     self.REST_METHOD = REST_METHOD # defines what moves will the workers takes
     self.TABLE_NAME = TABLE_NAME
+    self.URL = URL
+    self.TARGET_FIELD = TARGET_FIELD
     self.APPSOURCE = APPSOURCE
     self.APPKEY = APPKEY
     return self
@@ -418,12 +422,19 @@ class RestfulIO(Core):
 
   @staticmethod
   def getDataArgs(key, TABLE_NAME, APPSOURCE, APPKEY):
-    urlargs = {'source': APPSOURCE,
-               'appkey': APPKEY,
-               'table': TABLE_NAME,
-               "cache": False,
-               'key': key
-              }
+    urlargs = {"cache" : False}
+    if TABLE_NAME:
+      urlargs['table'] = TABLE_NAME
+    if APPKEY:
+      urlargs['appkey'] = APPKEY
+    if APPSOURCE:
+      urlargs['source'] = APPSOURCE
+    if isinstance(key, dict):
+      urlargs['key'] = json.dumps(key)
+      for k in key:
+        urlargs[k] = key[k]
+    else:
+      urlargs['key'] = key
     return urlargs
 
 
@@ -450,7 +461,7 @@ class RestfulIO(Core):
       return {}
 
 
-  def insertIntoDB(self, data):
+  def postDB(self, data, target='result'):
     """
     @Parameters
     ---------------------------
@@ -461,52 +472,24 @@ class RestfulIO(Core):
     | json result, e.g., {"result": True} 
     """
     try:    
-      url = 'http://i2.api.weibo.com/2/darwin/table/put.json'
+      url = self.URL
+      target = self.TARGET_FIELD if self.TARGET_FIELD is not None else target
       res = self.request(url, data, 'post')
       if not res or 'error' in res:
-        logging.error('PUT ERROR\t%s', data)
+        logging.error('%s ERROR\t%s', url, data)
         return {}
-      if 'result' not in res:
-        logging.warning('PUT FAIL'+'\t%s', data)
+      if target and target not in res:
+        logging.warning('%s FAIL TO GET %s'+'\t%s', url, target, data)
         return {}
       else:
-        logging.info('PUT SUCCESS'+'\t%s'*2, data, res)
+        logging.info('%s SUCCESS'+'\t%s'*2, url, data, res)
         return res
     except:
-      logging.exception('PUT UNKNOWN ERROR'+'\t%s'*2, data, self.TABLE_NAME)
+      logging.exception('%s UNKNOWN ERROR'+'\t%s'*2, url, data, self.TABLE_NAME)
       return {}
 
 
-  def deleteFromDB(self, data):
-    """
-    @Parameters
-    ---------------------------
-    | data: single line of data as dict, 
-    |       e.g.,{"object_id": object_id, "article_id": article_id} 
-    |       or just the a primary key, {"object_id", object_id}
-    @Returns
-    ---------------------------
-    | json result, e.g., {"result": True} 
-
-    """
-    try:
-      url = 'http://i2.api.weibo.com/2/darwin/table/delete.json?'
-      res = self.request(url, data, 'post')
-      if not res or 'error' in res:
-        logging.error('DELETE ERROR\t%s', data)
-        return {}
-      if 'result' not in res:
-        logging.warning('DELETE FAIL'+'\t%s', data)
-        return {}
-      else:
-        logging.info('DELETE SUCCESS'+'\t%s'*2, data, res)
-        return res
-    except:
-      logging.exception('DELETE UNKNOWN ERROR'+'\t%s'*2, data, self.TABLE_NAME)
-      return {}
-
-
-  def showDB(self, key):
+  def getDB(self, key, target='columns'):
     """
     @Parameters
     ---------------------------
@@ -517,21 +500,22 @@ class RestfulIO(Core):
 
     """
     try:
-      url = 'http://i2.api.weibo.com/2/darwin/table/show.json?'
+      url = self.URL
+      target = self.TARGET_FIELD if self.TARGET_FIELD is not None else target
       res = self.request(url, key, 'get')
       if not res or 'error' in res:
-        logging.error('SHOW ERROR\t%s', key)
+        logging.error('%s ERROR\t%s', url, key)
         return {}
-      if 'columns' not in res:
-        logging.warning('SHOW FAIL'+'\t%s', key)
+      if target and target not in res:
+        logging.warning('%s FAIL TO GET %s'+'\t%s', url, target, key)
         return {}
       else:
-        res = res['columns']
-        logging.info('SHOW SUCCESS'+'\t%s'*2, key, res)
+        res = res[target] if target else res
+        logging.info('%s SUCCESS'+'\t%s'*2, url, key, res)
         self.to_queue.put(res) # en_to_queue
         return res
     except:
-      logging.exception('SHOW WITH UNKNOWN ERROR'+'\t%s'*2, key, self.TABLE_NAME)
+      logging.exception('%s WITH UNKNOWN ERROR'+'\t%s'*2, url, key, self.TABLE_NAME)
       return {}
 
 
@@ -559,12 +543,10 @@ class RestfulIO(Core):
     Main function, called when start() is called. 
     Call the queue consumer and get things done.
     """
-    if self.REST_METHOD == 'insert':
-      self._irun(self.insertIntoDB)
-    elif self.REST_METHOD == 'delete':
-      self._irun(self.deleteFromDB)
-    elif self.REST_METHOD == 'show':
-      self._irun(self.showDB)
+    if self.REST_METHOD in ['post', 'insert', 'delete']:
+      self._irun(self.postDB)
+    elif self.REST_METHOD in ['get', 'show']:
+      self._irun(self.getDB)
     elif self.REST_METHOD == 'test':
       self._irun(self.testfunc)
 
@@ -635,5 +617,6 @@ class RestfulIO(Core):
 
 
 if __name__ == "__main__":
+
   pass
 

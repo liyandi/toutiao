@@ -1,9 +1,6 @@
 # Compiled python modules.
 *.pyc
-<<<<<<< HEAD
-=======
 *.swp
->>>>>>> be85159... added git
 
 # Setuptools distribution folder.
 /dist/
@@ -12,10 +9,9 @@
 /build/
 /log/
 /toutiaoframe/connect.sh
-<<<<<<< HEAD
-=======
 /test/newfile
->>>>>>> be85159... added git
+/test/test_api.py
+/test/test_rest.py
 
 # Python egg metadata, regenerated from source files by setuptools.
 /*.egg-info
