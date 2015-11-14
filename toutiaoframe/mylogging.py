@@ -36,7 +36,7 @@ class CustomAdapter(logging.LoggerAdapter):
 def getLogger(logname='root'):
     
   logger = logging.getLogger(logname)
-  logger.setLevel(logging.DEBUG)
+  logger.setLevel(logging.INFO)
                             
   DIR = '../log/'
   if DIR: # not none
@@ -57,7 +57,7 @@ def getLogger(logname='root'):
   # handler = logging.StreamHandler(sys.stdout)
   LOG_FILENAME = os.path.abspath(DIR + logname + '.info')
   handler = ConcurrentRotatingFileHandler(LOG_FILENAME, "a", 200*1024*1024, 5)
-  handler.setLevel(logging.DEBUG)
+  handler.setLevel(logging.INFO)
   formatter = logging.Formatter("%(asctime)s\t%(name)s-%(process)s-%(threadName)s\t%(message)s")
   handler.setFormatter(formatter)
   handler.addFilter(LevelFilter(logging.INFO))

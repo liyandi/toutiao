@@ -3,7 +3,7 @@
 ##################################################
 # AUTHOR : Yandi LI
 # CREATED_AT : 2015-09-15
-# LAST_MODIFIED : 2015年11月14日 星期六 18时54分32秒
+# LAST_MODIFIED : 2015年11月14日 星期六 22时28分13秒
 # USAGE : python core.py
 # PURPOSE : TODO
 ##################################################
@@ -92,7 +92,7 @@ class FileIO(threading.Thread):
     if file_method in ['w', 'a']:
       nstr = '\n' if append_newline else ''
       if encode == 'utf-8':
-        formatter = lambda x: (('{0}' + nstr).format(x)).encode('utf-8')
+        formatter = lambda x: ('{0}' + nstr).format(x.encode('utf-8'))
       elif encode == 'json':
         formatter = lambda x: ('{0}' + nstr).format(json.dumps(x))
       elif isinstance(encode, list):
@@ -127,14 +127,14 @@ class FileIO(threading.Thread):
     self._irun()
 
 
-  def end(self):             
+  def end(self, TIMEOUT=None):             
     """
     Interface function, used to end the daemon and kill the wait.
     End of start()
     """
     if self.file_method in ['w', 'a']:
       self.en_from_queue(None) # send terminate signal to workers
-    self.join() # stop the thread itself
+    self.join(timeout=TIMEOUT) # stop the thread itself
 
 
   def en_from_queue(self, line):
@@ -243,13 +243,13 @@ class UpdateSubsciber(threading.Thread):
     self._irun()
 
 
-  def end(self):             
+  def end(self, TIMEOUT=None):             
     """
     Interface function, used to end the daemon and kill the wait.
     End of start()
     """
     self._keep_alive = False
-    self.join() # stop the thread itself
+    self.join(timeout=TIMEOUT) # stop the thread itself
 
   
   def testfunc(self):
@@ -539,7 +539,7 @@ class RestfulIO(Core):
     """
     Dummy for test purpose
     """
-    logging.info("Processed: %s", line)
+    logging.debug("Processed: %s", line)
     self.to_queue.put(line+'\n') # en_to_queue
     logging.info("Length of to_queue: %d", self._to_queue.qsize())
 
