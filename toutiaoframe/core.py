@@ -3,7 +3,7 @@
 ##################################################
 # AUTHOR : Yandi LI
 # CREATED_AT : 2015-09-15
-# LAST_MODIFIED : 2015年11月14日 星期六 16时46分14秒
+# LAST_MODIFIED : 2015年11月14日 星期六 18时54分32秒
 # USAGE : python core.py
 # PURPOSE : TODO
 ##################################################
@@ -97,7 +97,7 @@ class FileIO(threading.Thread):
         formatter = lambda x: ('{0}' + nstr).format(json.dumps(x))
       elif isinstance(encode, list):
         def dict2csv(di, keys):
-          res = '\t'.join([di.get(k, '') for k in keys]) 
+          res = '\t'.join([unicode(di.get(k, '')) for k in keys]) 
           if isinstance(res, unicode):
             return res.decode('utf-8') + nstr
           else:
@@ -112,6 +112,8 @@ class FileIO(threading.Thread):
         formatter = lambda x: x.decode('utf-8').rstrip('\r\n')
       elif encode == 'utf-8' and not append_newline:
         formatter = lambda x: x.decode('utf-8')
+      elif append_newline:
+        formatter = lambda x: x.rstrip('\r\n')
       else:
         formatter = lambda x: x
       return formatter
@@ -151,7 +153,7 @@ class FileIO(threading.Thread):
       logging.debug("STARTING WORKERS: %s", 'reader')
       for line in f:
         try:
-          self._queue.put(line)
+          self._queue.put(self._format(line))
         except:
           logging.exception(line)
       logging.debug("WORKER SESSION ENDED: %s", 'reader')

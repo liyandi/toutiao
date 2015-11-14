@@ -3,7 +3,7 @@
 ##################################################
 # AUTHOR : Yandi LI
 # CREATED_AT : 2015-11-12
-# LAST_MODIFIED : 2015年11月14日 星期六 16时39分20秒
+# LAST_MODIFIED : 2015年11月14日 星期六 18时51分19秒
 # USAGE : python test_core.py
 # PURPOSE : TODO
 ##################################################
@@ -78,33 +78,33 @@ if __name__ == "__main__":
   ##################################
   ## TEST RestfulIO combined with Restful queries
   ##################################
-  pput = T.RestfulIO().config(REST_METHOD='insert', TABLE_NAME='article_duplicate')
-  pshow = T.RestfulIO().config(REST_METHOD='show', TABLE_NAME='article_duplicate')
-  pdel = T.RestfulIO().config(REST_METHOD='delete', TABLE_NAME='article_duplicate')
-  pf = T.FileIO('newfile', 'a', encode=['object_id', 'article_id'], append_newline=True) 
-  pf.IOQueue = pshow.to_queue
-  for p in [pput, pshow, pdel, pf]:
-    p.start()
+  ## pput = T.RestfulIO().config(REST_METHOD='insert', TABLE_NAME='article_duplicate')
+  ## pshow = T.RestfulIO().config(REST_METHOD='show', TABLE_NAME='article_duplicate')
+  ## pdel = T.RestfulIO().config(REST_METHOD='delete', TABLE_NAME='article_duplicate')
+  ## pf = T.FileIO('newfile', 'a', encode=['object_id', 'article_id'], append_newline=True) 
+  ## pf.IOQueue = pshow.to_queue
+  ## for p in [pput, pshow, pdel, pf]:
+  ##   p.start()
 
-  for i,j in zip(['1', '2'], ['1', '1'], ):
-    pshow.en_from_queue(i)
-  for i,j in zip(['1', '2'], ['1', '1'], ):
-    data = {"object_id": i, "article_id": j}  
-    pput.en_from_queue(data)
+  ## for i,j in zip(['1', '2'], ['1', '1'], ):
+  ##   pshow.en_from_queue(i)
+  ## for i,j in zip(['1', '2'], ['1', '1'], ):
+  ##   data = {"object_id": i, "article_id": j}  
+  ##   pput.en_from_queue(data)
 
-  time.sleep(2) # for insertion to finish
-  for i,j in zip(['1', '2'], ['1', '1'], ):
-    pshow.en_from_queue(i)
-  for i,j in zip(['1', '2'], ['1', '1'], ):
-    data = {"object_id": i}  
-    pdel.en_from_queue(data)
+  ## time.sleep(2) # for insertion to finish
+  ## for i,j in zip(['1', '2'], ['1', '1'], ):
+  ##   pshow.en_from_queue(i)
+  ## for i,j in zip(['1', '2'], ['1', '1'], ):
+  ##   data = {"object_id": i}  
+  ##   pdel.en_from_queue(data)
 
-  time.sleep(2) # for insertion to finish
-  for i,j in zip(['1', '2'], ['1', '1'], ):
-    pshow.en_from_queue(i)
+  ## time.sleep(2) # for insertion to finish
+  ## for i,j in zip(['1', '2'], ['1', '1'], ):
+  ##   pshow.en_from_queue(i)
 
-  for p in [pput, pshow, pdel, pf]:
-    p.end()
+  ## for p in [pput, pshow, pdel, pf]:
+  ##   p.end()
 
   ##################################
   ## TEST UpdateSubsciber
@@ -116,3 +116,15 @@ if __name__ == "__main__":
   ## subprocess.check_call(["touch", "newfile"])
   ## time.sleep(30)
   ## pus.end()
+
+  ##################################
+  ## TEST FileIO dict2csv
+  ##################################
+  pfout = T.FileIO('result', 'w', encode=['article_id', 'level'])
+  pfout.en_from_queue({'article_id':'12', 'level':3, 'other':4})
+
+  for p in [pfout]:
+    p.start()
+
+  for p in [pfout]:
+    p.end()
