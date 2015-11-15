@@ -3,7 +3,7 @@
 ##################################################
 # AUTHOR : Yandi LI
 # CREATED_AT : 2015-11-12
-# LAST_MODIFIED : 2015年11月15日 星期日 00时56分23秒
+# LAST_MODIFIED : 2015年11月16日 星期一 01时13分48秒
 # USAGE : python test_core.py
 # PURPOSE : TODO
 ##################################################
@@ -79,9 +79,9 @@ if __name__ == "__main__":
   ## TEST RestfulIO combined with Restful queries
   ##################################
   pput = T.RestfulIO().config(REST_METHOD='insert', TABLE_NAME='article_duplicate', URL='http://i2.api.weibo.com/2/darwin/table/put.json')
-  pshow = T.RestfulIO().config(REST_METHOD='show', TABLE_NAME='article_duplicate', URL='http://i2.api.weibo.com/2/darwin/table/show.json')
+  pshow = T.RestfulIO().config(REST_METHOD='show', TABLE_NAME='article_duplicate', URL='http://i2.api.weibo.com/2/darwin/table/show.json', RETURN_KEY=True)
   pdel = T.RestfulIO().config(REST_METHOD='delete', TABLE_NAME='article_duplicate', URL='http://i2.api.weibo.com/2/darwin/table/delete.json')
-  pf = T.FileIO('newfile', 'a', encode=['object_id', 'article_id'], append_newline=True) 
+  pf = T.FileIO('newfile', 'a', encode='utf-8', append_newline=True) 
   pf.IOQueue = pshow.to_queue
   for p in [pput, pshow, pdel, pf]:
     p.start()

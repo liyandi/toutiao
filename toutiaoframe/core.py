@@ -3,7 +3,7 @@
 ##################################################
 # AUTHOR : Yandi LI
 # CREATED_AT : 2015-09-15
-# LAST_MODIFIED : 2015年11月15日 星期日 01时32分34秒
+# LAST_MODIFIED : 2015年11月16日 星期一 01时12分05秒
 # USAGE : python core.py
 # PURPOSE : TODO
 ##################################################
@@ -386,7 +386,9 @@ class RestfulIO(Core):
               TABLE_NAME='', 
               URL= '',
               TARGET_FIELD=None,
-              APPSOURCE=2936099636, APPKEY=1428722706):
+              APPSOURCE=2936099636, APPKEY=1428722706,
+              RETURN_KEY=False,
+              THREADS=500):
     """ Set model parameters
     @Parameters
     -----------------------------
@@ -395,16 +397,20 @@ class RestfulIO(Core):
     | TABLE_NAME: table name of the restful service, REQUIRED
     | URL: API e.g, 'http://i2.api.weibo.com/2/darwin/table/show.json', REQUIRED
     | TARGET_FIELD: denote the field name that we want to keep in the result json, 
+    | RETURN_KEY: in show method, if set to True, return (json, key); else return json
     | APPSOURCE: source of the restful service, defaulted
     | APPKEY: appkey of the restful, defaulted
+    | THREADS: number of multi-threading
     """
     assert REST_METHOD in ['post', 'get', 'test', 'insert', 'delete', 'show']
     self.REST_METHOD = REST_METHOD # defines what moves will the workers takes
     self.TABLE_NAME = TABLE_NAME
     self.URL = URL
     self.TARGET_FIELD = TARGET_FIELD
+    self.RETURN_KEY = RETURN_KEY
     self.APPSOURCE = APPSOURCE
     self.APPKEY = APPKEY
+    self.THREADS = THREADS
     return self
 
 
@@ -461,7 +467,7 @@ class RestfulIO(Core):
       return {}
 
 
-  def postDB(self, data, target='result'):
+  def postDB(self, data):
     """
     @Parameters
     ---------------------------
@@ -473,7 +479,7 @@ class RestfulIO(Core):
     """
     try:    
       url = self.URL
-      target = self.TARGET_FIELD if self.TARGET_FIELD is not None else target
+      target = self.TARGET_FIELD if self.TARGET_FIELD is not None else 'result'
       res = self.request(url, data, 'post')
       if not res or 'error' in res:
         logging.error('%s ERROR\t%s', url, data)
@@ -489,34 +495,47 @@ class RestfulIO(Core):
       return {}
 
 
-  def getDB(self, key, target='columns'):
+  def getDB(self, *key):
     """
     @Parameters
     ---------------------------
     | key: a line of the a primary key of the table, e.g. object_id
     @Returns
     ---------------------------
-    | json result, e.g., {"article_id":" 1022:2222", "object_id": "321232:12213"} 
-
+    | tuple: 1. json result, e.g., {"article_id":" 1022:2222", "object_id": "321232:12213"} 
+    |        2. key
     """
     try:
       url = self.URL
-      target = self.TARGET_FIELD if self.TARGET_FIELD is not None else target
-      res = self.request(url, key, 'get')
+      target = self.TARGET_FIELD if self.TARGET_FIELD is not None else 'columns'
+      return_key = self.RETURN_KEY
+      res = self.request(url, key[0], 'get')
       if not res or 'error' in res:
         logging.error('%s ERROR\t%s', url, key)
-        return {}
+        combo = self._wrap_get_result({}, key, return_key)
+        return combo
       if target and target not in res:
         logging.warning('%s FAIL TO GET %s'+'\t%s', url, target, key)
-        return {}
+        combo = self._wrap_get_result({}, key, return_key)
+        return combo
       else:
         res = res[target] if target else res
         logging.info('%s SUCCESS'+'\t%s'*2, url, key, res)
-        self.to_queue.put(res) # en_to_queue
-        return res
+        combo = self._wrap_get_result(res, key, return_key)
+        self.to_queue.put(combo) # en_to_queue
+        return combo
     except:
       logging.exception('%s WITH UNKNOWN ERROR'+'\t%s'*2, url, key, self.TABLE_NAME)
-      return {}
+      combo = self._wrap_get_result({}, key, return_key)
+      return combo
+
+  
+  @staticmethod
+  def _wrap_get_result(res, key, return_key=False):
+    if return_key:
+      return res, key
+    else:
+      return res
 
 
   def testfunc(self, line):
@@ -551,7 +570,7 @@ class RestfulIO(Core):
       self._irun(self.testfunc)
 
 
-  def _irun(self, func, NUM_THREAD=1000):
+  def _irun(self, func, ):
     """ Read from from_queue and send lines to database via Restful.
     Ends when a None/empty string is put in the from_queue
     @Parameters
@@ -560,7 +579,7 @@ class RestfulIO(Core):
     |         who works on a single line of data
     | KEEP_RETURNS: True if we want to keep the result in the to_queue, False if we 
     |               want to discard the result
-    | NUM_THREAD: number of threads for calling the Restful service
+    | THREADS: number of threads for calling the Restful service
     @Returns
     ---------------------------
     | to_queue is filled with results
@@ -575,7 +594,7 @@ class RestfulIO(Core):
           worker = threading.Thread(target=func, args=(line, ))
           workers.append(worker)
           worker.start(); count += 1
-          if count % NUM_THREAD == 0:
+          if count % self.THREADS == 0:
             for worker in workers:
               worker.join(timeout=10)
             workers = []; count = 0
@@ -589,7 +608,7 @@ class RestfulIO(Core):
               worker = threading.Thread(target=func, args=(line, ))
               workers.append(worker)
               worker.start(); count += 1
-              if count % NUM_THREAD == 0:
+              if count % self.THREADS == 0:
                 for worker in workers:
                   worker.join(timeout=10)
                 workers = []; count = 0
