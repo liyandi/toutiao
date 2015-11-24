@@ -2,4 +2,4 @@ include README.md
 include LICENSE
 include test/*
 include log/
-exclude src/connect.sh
+exclude toutiaoframe/mylogging.py

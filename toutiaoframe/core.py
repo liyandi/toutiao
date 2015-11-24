@@ -3,19 +3,16 @@
 ##################################################
 # AUTHOR : Yandi LI
 # CREATED_AT : 2015-09-15
-# LAST_MODIFIED : 2015年11月16日 星期一 01时12分05秒
+# LAST_MODIFIED : 2015年11月24日 星期二 17时30分21秒
 # USAGE : python core.py
 # PURPOSE : TODO
 ##################################################
-import mylogging
+import logging
 import threading
 import multiprocessing
 import multiprocessing.queues as Queue
 import os, time
 import requests, json
-
-
-logging = mylogging.getLogger('Core')
 
 
 class FileIO(threading.Thread):
@@ -26,8 +23,9 @@ class FileIO(threading.Thread):
   When initiated with write method, read from its own queue 
   and write to a file in system
   """
-  def __init__(self, filename, file_method='r', IOQueue=None,
-              daemon=False, encode='utf-8', append_newline=True):
+  def __init__(self, filename, file_method='r', IOQueue=None, 
+              daemon=False, encode='utf-8', append_newline=True, 
+              logger=None):
     """
     @Parameters
     --------------------------
@@ -50,6 +48,7 @@ class FileIO(threading.Thread):
     self.filename = filename
     self.daemon = daemon
     self.IOQueue = IOQueue if IOQueue else Queue.Queue()
+    self.logger = logger or logging.getLogger(__name__)
     self._format = self._build_formatter(self.file_method, encode, append_newline) 
 
 
@@ -68,7 +67,7 @@ class FileIO(threading.Thread):
     if isinstance(q, Queue.Queue):
       self._queue = q
     else:
-      logging.error('DENIED: Please use multiprocessing.queues.Queue for save IO.')
+      self.logger.error('DENIED: Please use multiprocessing.queues.Queue for save IO.')
 
 
   @property
@@ -150,40 +149,40 @@ class FileIO(threading.Thread):
     """
     f = open(self.filename, self.file_method)
     if self.file_method == 'r':
-      logging.debug("STARTING WORKERS: %s", 'reader')
+      self.logger.debug("STARTING WORKERS: %s", 'reader')
       for line in f:
         try:
           self._queue.put(self._format(line))
         except:
-          logging.exception(line)
-      logging.debug("WORKER SESSION ENDED: %s", 'reader')
+          self.logger.exception(line)
+      self.logger.debug("WORKER SESSION ENDED: %s", 'reader')
     elif self.file_method in ['w', 'a']:
-      logging.info("STARTING WORKERS: %s", 'writer')
+      self.logger.info("STARTING WORKERS: %s", 'writer')
       while True:
         try:
           line = self._queue.get()
           if line is not None:
             f.write(self._format(line))
-            logging.debug("Processed: %s", line)
+            self.logger.debug("Processed: %s", line)
           else:
-            logging.info("WORKER SESSION ENDED: %s", 'writer')
+            self.logger.info("WORKER SESSION ENDED: %s", 'writer')
             ## CLEANUP THE REST OF THE QUEUE
             while True:
               try:
                 line = self._queue.get_nowait()
                 if not line: continue
                 f.write(self._format(line))
-                logging.info("MORE LINE AFTER TERM_SIG: %s", line)
+                self.logger.info("MORE LINE AFTER TERM_SIG: %s", line)
               except Queue.Empty:
                 break
             ## END THE JOB
             break
         except:
-          logging.exception(line)
+          self.logger.exception(line)
 
 
 
-class UpdateSubsciber(threading.Thread):
+class FileWatcher(threading.Thread):
   """
   Class that records the configuration files that some class/function depends.
   When an object registers to this thread, it routinely checks the last modified time of config files,
@@ -191,13 +190,14 @@ class UpdateSubsciber(threading.Thread):
   e.g., so the class variables will be updated.
   """
 
-  def __init__(self, WATCH_CYCLE=300, daemon=True):
+  def __init__(self, WATCH_CYCLE=300, daemon=True, logger=None):
     """
     @Parameters
     -------------------------
     | WATCH_CYCLE: number of seconds for a watch-cycle
     """
     super(self.__class__, self).__init__()
+    self.logger = logger or logging.getLogger(__name__)
     self.daemon = daemon
     self.registerTable = {}
     self.WATCH_CYCLE = WATCH_CYCLE
@@ -234,7 +234,7 @@ class UpdateSubsciber(threading.Thread):
     self._registerTable[objectCallBack] = {'configFiles': {}}
     for fname in configFiles:
       self._registerTable[objectCallBack]['configFiles'][fname] = os.stat(fname).st_mtime
-      logging.debug("FILE REGISTERED: calls %s when %s changes", objectCallBack, fname)
+      self.logger.debug("FILE REGISTERED: calls %s when %s changes", objectCallBack, fname)
 
 
   def run(self):
@@ -253,13 +253,13 @@ class UpdateSubsciber(threading.Thread):
 
   
   def testfunc(self):
-    logging.info("TEST FUNCTION CALLED, registerTable %s", self.registerTable)
+    self.logger.info("TEST FUNCTION CALLED, registerTable %s", self.registerTable)
 
 
   def _irun(self):
     """ Main, check the register table regularily. Update if neccessary.
     """
-    logging.info('STARTING WORKER: %s', self)
+    self.logger.info('STARTING WORKER: %s', self)
     while self._keep_alive:
       for objectCallBack in self._registerTable:
         is_modified = False
@@ -269,7 +269,7 @@ class UpdateSubsciber(threading.Thread):
           ntime = os.stat(fname).st_mtime
           if ntime != mtime:
             is_modified = True
-            logging.info("CONFIG FILE MODIFIED: %s AT %s", fname, ntime)
+            self.logger.info("CONFIG FILE MODIFIED: %s AT %s", fname, ntime)
             break
 
         if is_modified:
@@ -277,15 +277,15 @@ class UpdateSubsciber(threading.Thread):
             self._registerTable[objectCallBack]['configFiles'][fname] = os.stat(fname).st_mtime
           ## call the subscriber's call backs
           objectCallBack()
-          logging.info("CALLS BACK DONE: %s", objectCallBack.func_name)
+          self.logger.info("CALLS BACK DONE: %s", objectCallBack.func_name)
 
       if self._keep_alive:
         time.sleep(self.WATCH_CYCLE)
-    logging.info('WORKER SESSION ENDED: %s', self)
+    self.logger.info('WORKER SESSION ENDED: %s', self)
 
 
 
-class Core(multiprocessing.Process):
+class Core(object):
   """
   Central Processing Unit
   Defines a pure virtual class with a bunch of handy properties:
@@ -303,10 +303,10 @@ class Core(multiprocessing.Process):
   * basic from_queue and to_queue structure
   * automatic updates of configuration files
   """
-  def __init__(self,
+  def __init__(self, 
                 from_queue=None,
                 to_queue=None,
-                daemon=False):
+                logger=None, *args, **kwargs):
     """
     @Parameter
     --------------------------
@@ -314,8 +314,8 @@ class Core(multiprocessing.Process):
     | to_queue: where the workers put the results
     | daemon: if runs as daemon process
     """
-    super(Core, self).__init__()
-    self.daemon = daemon
+    super(Core, self).__init__(*args, **kwargs)
+    self.logger = logger or logging.getLogger(__name__)
     self.from_queue = from_queue if from_queue else Queue.Queue()
     self.to_queue = to_queue if to_queue else Queue.Queue()
 
@@ -334,7 +334,7 @@ class Core(multiprocessing.Process):
     if isinstance(q, Queue.Queue):
       self._from_queue = q
     else:
-      logging.error('DENIED: Please use multiprocessing.queues.Queue for save IO.')
+      self.logger.error('DENIED: Please use multiprocessing.queues.Queue for save IO.')
 
 
   @property
@@ -351,7 +351,7 @@ class Core(multiprocessing.Process):
     if isinstance(q, Queue.Queue):
       self._to_queue = q
     else:
-      logging.error('DENIED: Please use multiprocessing.queues.Queue for save IO.')
+      self.logger.error('DENIED: Please use multiprocessing.queues.Queue for save IO.')
 
 
   def en_from_queue(self, line):
@@ -377,10 +377,15 @@ class Core(multiprocessing.Process):
 
 
 
-class RestfulIO(Core):
+class RestfulIO(Core, threading.Thread):
   """  
   Have to be initialized with config(), setting basic params of the Restful query.
   """
+  def __init__(self, daemon=False, *args, **kwargs):
+    super(self.__class__, self).__init__(*args, **kwargs)
+    self.daemon = daemon
+
+
   def config(self, 
               REST_METHOD= 'post', 
               TABLE_NAME='', 
@@ -463,7 +468,7 @@ class RestfulIO(Core):
       except requests.RequestException:
         continue
     else:
-      logging.warning('TRYOUT\t%s\t%s\t%s', url, urlargs, req.text) 
+      self.logger.warning('TRIED OUT BY %d TIMES\t%s\t%s', TRYOUT, url, urlargs) 
       return {}
 
 
@@ -482,16 +487,16 @@ class RestfulIO(Core):
       target = self.TARGET_FIELD if self.TARGET_FIELD is not None else 'result'
       res = self.request(url, data, 'post')
       if not res or 'error' in res:
-        logging.error('%s ERROR\t%s', url, data)
+        self.logger.error('%s ERROR\t%s', url, data)
         return {}
       if target and target not in res:
-        logging.warning('%s FAIL TO GET %s'+'\t%s', url, target, data)
+        self.logger.warning('%s FAIL TO GET %s'+'\t%s', url, target, data)
         return {}
       else:
-        logging.info('%s SUCCESS'+'\t%s'*2, url, data, res)
+        self.logger.info('%s SUCCESS'+'\t%s'*2, url, data, res)
         return res
     except:
-      logging.exception('%s UNKNOWN ERROR'+'\t%s'*2, url, data, self.TABLE_NAME)
+      self.logger.exception('%s UNKNOWN ERROR'+'\t%s'*2, url, data, self.TABLE_NAME)
       return {}
 
 
@@ -511,21 +516,21 @@ class RestfulIO(Core):
       return_key = self.RETURN_KEY
       res = self.request(url, key[0], 'get')
       if not res or 'error' in res:
-        logging.error('%s ERROR\t%s', url, key)
+        self.logger.error('%s ERROR\t%s', url, key)
         combo = self._wrap_get_result({}, key, return_key)
         return combo
       if target and target not in res:
-        logging.warning('%s FAIL TO GET %s'+'\t%s', url, target, key)
+        self.logger.warning('%s FAIL TO GET %s'+'\t%s', url, target, key)
         combo = self._wrap_get_result({}, key, return_key)
         return combo
       else:
         res = res[target] if target else res
-        logging.info('%s SUCCESS'+'\t%s'*2, url, key, res)
+        self.logger.info('%s SUCCESS'+'\t%s'*2, url, key, res)
         combo = self._wrap_get_result(res, key, return_key)
         self.to_queue.put(combo) # en_to_queue
         return combo
     except:
-      logging.exception('%s WITH UNKNOWN ERROR'+'\t%s'*2, url, key, self.TABLE_NAME)
+      self.logger.exception('%s WITH UNKNOWN ERROR'+'\t%s'*2, url, key, self.TABLE_NAME)
       combo = self._wrap_get_result({}, key, return_key)
       return combo
 
@@ -542,9 +547,9 @@ class RestfulIO(Core):
     """
     Dummy for test purpose
     """
-    logging.debug("Processed: %s", line)
+    self.logger.debug("Processed: %s", line)
     self.to_queue.put(line+'\n') # en_to_queue
-    logging.info("Length of to_queue: %d", self._to_queue.qsize())
+    self.logger.info("Length of to_queue: %d", self._to_queue.qsize())
 
 
   def end(self, TIMEOUT=None):             
@@ -585,11 +590,11 @@ class RestfulIO(Core):
     | to_queue is filled with results
     """
     workers = []; count = 0
-    logging.info("STARTING WORKERS: %s", func.func_name)
+    self.logger.info("STARTING WORKERS: %s", func.func_name)
     while True:
       try:
         line = self._from_queue.get()
-        logging.debug("Got from queue: %s", line)
+        self.logger.debug("Got from queue: %s", line)
         if line is not None:
           worker = threading.Thread(target=func, args=(line, ))
           workers.append(worker)
@@ -612,25 +617,25 @@ class RestfulIO(Core):
                 for worker in workers:
                   worker.join(timeout=10)
                 workers = []; count = 0
-              logging.info("MORE LINE AFTER TERM_SIG: %s", line)
+              self.logger.info("MORE LINE AFTER TERM_SIG: %s", line)
             except Queue.Empty:
               break
             except:
-              logging.exception('UNKNOWN ERROR IN LINE\t%s', line.strip())
+              self.logger.exception('UNKNOWN ERROR IN LINE\t%s'.strip(), line)
               continue
           if len(workers) > 0:
             for worker in workers:
               worker.join(timeout=10)
-          logging.info('WORKER SESSION ENDED: %s', func.func_name)
+          self.logger.info('WORKER SESSION ENDED: %s', func.func_name)
           break
       except Queue.Empty:
           if len(workers) > 0:
             for worker in workers:
               worker.join(timeout=10)
-          logging.info('NO MORE INPUT/END_OF_FILE AFTER TIMEOUT, WORKER SESSION ENDED')
+          self.logger.info('NO MORE INPUT/END_OF_FILE AFTER TIMEOUT, WORKER SESSION ENDED')
           break
       except:
-        logging.exception('UNKNOWN ERROR IN LINE\t%s', line.strip())
+        self.logger.exception('UNKNOWN ERROR IN LINE\t%s'.strip(), line)
         continue
         
 

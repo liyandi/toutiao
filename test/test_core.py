@@ -3,7 +3,7 @@
 ##################################################
 # AUTHOR : Yandi LI
 # CREATED_AT : 2015-11-12
-# LAST_MODIFIED : 2015年11月16日 星期一 01时13分48秒
+# LAST_MODIFIED : 2015年11月24日 星期二 10时51分01秒
 # USAGE : python test_core.py
 # PURPOSE : TODO
 ##################################################
@@ -47,17 +47,17 @@ if __name__ == "__main__":
   ##################################
   ## TEST RestfulIO combined with FileIO
   ##################################
-  ## # we write to a, b read from to_queue for a and write to a file
-  ## a = T.RestfulIO().config(REST_METHOD='test')
-  ## b = T.FileIO('newfile', 'a') 
-  ## b.IOQueue = a.to_queue
-  ## for p in [a, b]:
-  ##   p.start()
-  ## for i in xrange(10):
-  ##   a.en_from_queue(str(i))
-  ##   time.sleep(random.randint(0,3))
-  ## for p in [a, b]:
-  ##   p.end()
+  # we write to a, b read from to_queue for a and write to a file
+  a = T.RestfulIO().config(REST_METHOD='test')
+  b = T.FileIO('newfile', 'a') 
+  b.IOQueue = a.to_queue
+  for p in [a, b]:
+    p.start()
+  for i in xrange(10):
+    a.en_from_queue(str(i))
+    time.sleep(random.randint(0,3))
+  for p in [a, b]:
+    p.end()
   
   ##################################
   ## TEST RestfulIO combined with FileIO, fault-aproof
@@ -78,38 +78,38 @@ if __name__ == "__main__":
   ##################################
   ## TEST RestfulIO combined with Restful queries
   ##################################
-  pput = T.RestfulIO().config(REST_METHOD='insert', TABLE_NAME='article_duplicate', URL='http://i2.api.weibo.com/2/darwin/table/put.json')
-  pshow = T.RestfulIO().config(REST_METHOD='show', TABLE_NAME='article_duplicate', URL='http://i2.api.weibo.com/2/darwin/table/show.json', RETURN_KEY=True)
-  pdel = T.RestfulIO().config(REST_METHOD='delete', TABLE_NAME='article_duplicate', URL='http://i2.api.weibo.com/2/darwin/table/delete.json')
-  pf = T.FileIO('newfile', 'a', encode='utf-8', append_newline=True) 
-  pf.IOQueue = pshow.to_queue
-  for p in [pput, pshow, pdel, pf]:
-    p.start()
+  ## pput = T.RestfulIO().config(REST_METHOD='insert', TABLE_NAME='article_duplicate', URL='http://i2.api.weibo.com/2/darwin/table/put.json')
+  ## pshow = T.RestfulIO().config(REST_METHOD='show', TABLE_NAME='article_duplicate', URL='http://i2.api.weibo.com/2/darwin/table/show.json', RETURN_KEY=True)
+  ## pdel = T.RestfulIO().config(REST_METHOD='delete', TABLE_NAME='article_duplicate', URL='http://i2.api.weibo.com/2/darwin/table/delete.json')
+  ## pf = T.FileIO('newfile', 'a', encode='utf-8', append_newline=True) 
+  ## pf.IOQueue = pshow.to_queue
+  ## for p in [pput, pshow, pdel, pf]:
+  ##   p.start()
 
-  for i in ['1', '2']:
-    pshow.en_from_queue(i)
-  for i,j in zip(['1', '2'], ['1', '1'],):
-    data = {"object_id": i, "article_id": j}  
-    pput.en_from_queue(data)
+  ## for i in ['1', '2']:
+  ##   pshow.en_from_queue(i)
+  ## for i,j in zip(['1', '2'], ['1', '1'],):
+  ##   data = {"object_id": i, "article_id": j}  
+  ##   pput.en_from_queue(data)
 
-  time.sleep(2) # for insertion to finish
-  for i in ['1', '2']:
-    pshow.en_from_queue(i)
-  for i,j in zip(['1', '2'], ['1', '1'],):
-    data = {"object_id": i}  
-    pdel.en_from_queue(data)
+  ## time.sleep(2) # for insertion to finish
+  ## for i in ['1', '2']:
+  ##   pshow.en_from_queue(i)
+  ## for i,j in zip(['1', '2'], ['1', '1'],):
+  ##   data = {"object_id": i}  
+  ##   pdel.en_from_queue(data)
 
-  time.sleep(2) # for insertion to finish
-  for i in ['1', '2']:
-    pshow.en_from_queue(i)
+  ## time.sleep(2) # for insertion to finish
+  ## for i in ['1', '2']:
+  ##   pshow.en_from_queue(i)
 
-  for p in [pput, pshow, pdel, pf]:
-    p.end()
+  ## for p in [pput, pshow, pdel, pf]:
+  ##   p.end()
 
   ##################################
-  ## TEST UpdateSubsciber
+  ## TEST FileWatcher
   ##################################
-  ## pus = T.UpdateSubsciber(WATCH_CYCLE=20)
+  ## pus = T.FileWatcher(WATCH_CYCLE=20)
   ## pus.start()
   ## pus.register(pus.testfunc, ['newfile'])
   ## time.sleep(5)
